@@ -47,8 +47,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import ssl
 
-import requests
+import certifi
+import httpx
 from langchain_core.tools import tool
 
 # ─── Venue database ───────────────────────────────────────────────────────────
@@ -84,6 +86,28 @@ VENUES = {
         "address": "80 West Bow, Edinburgh",
     },
 }
+
+
+RELAX_X509_STRICT = os.getenv("NEBIUS_RELAX_X509_STRICT", "1").lower() not in {
+    "0",
+    "false",
+    "no",
+}
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+    ctx.load_verify_locations(cafile=certifi.where())
+
+    extra_cafile = os.getenv("SSL_CERT_FILE")
+    extra_capath = os.getenv("SSL_CERT_DIR")
+    if extra_cafile or extra_capath:
+        ctx.load_verify_locations(cafile=extra_cafile, capath=extra_capath)
+
+    if RELAX_X509_STRICT and hasattr(ssl, "VERIFY_X509_STRICT"):
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
+    return ctx
 
 
 @tool
@@ -137,18 +161,18 @@ def get_edinburgh_weather() -> str:
     Use this to advise whether an outdoor area at the venue is suitable.
     """
     try:
-        resp = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": 55.95,
-                "longitude": -3.19,
-                "current": "temperature_2m,weather_code,precipitation",
-                "forecast_days": 1,
-            },
-            timeout=8,
-        )
-        resp.raise_for_status()
-        data = resp.json().get("current", {})
+        with httpx.Client(verify=_build_ssl_context(), timeout=8.0) as weather_client:
+            resp = weather_client.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": 55.95,
+                    "longitude": -3.19,
+                    "current": "temperature_2m,weather_code,precipitation",
+                    "forecast_days": 1,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json().get("current", {})
         code = data.get("weather_code", -1)
         descriptions = {
             0: "Clear sky",
@@ -171,7 +195,7 @@ def get_edinburgh_weather() -> str:
                 "outdoor_ok": code in {0, 1, 2},
             }
         )
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         return json.dumps({"success": False, "error": "Weather API timed out"})
     except Exception as exc:
         return json.dumps({"success": False, "error": str(exc)})

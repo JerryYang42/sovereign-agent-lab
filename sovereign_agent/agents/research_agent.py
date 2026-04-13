@@ -44,7 +44,10 @@ from __future__ import annotations
 
 import json
 import os
+import ssl
 
+import certifi
+import httpx
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
@@ -74,11 +77,36 @@ load_dotenv()
 
 RESEARCH_MODEL = os.getenv("RESEARCH_MODEL", "Qwen/Qwen3-32B")
 
+RELAX_X509_STRICT = os.getenv("NEBIUS_RELAX_X509_STRICT", "1").lower() not in {
+    "0",
+    "false",
+    "no",
+}
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+    ctx.load_verify_locations(cafile=certifi.where())
+
+    extra_cafile = os.getenv("SSL_CERT_FILE")
+    extra_capath = os.getenv("SSL_CERT_DIR")
+    if extra_cafile or extra_capath:
+        ctx.load_verify_locations(cafile=extra_cafile, capath=extra_capath)
+
+    if RELAX_X509_STRICT and hasattr(ssl, "VERIFY_X509_STRICT"):
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
+    return ctx
+
+
+http_client = httpx.Client(verify=_build_ssl_context(), timeout=60.0)
+
 llm = ChatOpenAI(
     base_url="https://api.tokenfactory.nebius.com/v1/",
     api_key=os.getenv("NEBIUS_KEY"),
     model=RESEARCH_MODEL,
     temperature=0,
+    http_client=http_client,
 )
 
 # ─── Tool registry ────────────────────────────────────────────────────────────
