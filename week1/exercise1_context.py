@@ -67,17 +67,50 @@ Then fill in week1/answers/ex1_answers.py.
 
 import json
 import os
+import ssl
 import sys
 from pathlib import Path
 
+import certifi
+import httpx
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
+RELAX_X509_STRICT = os.getenv("NEBIUS_RELAX_X509_STRICT", "1").lower() not in {
+    "0",
+    "false",
+    "no",
+}
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+
+    # Keep a stable CA baseline.
+    ctx.load_verify_locations(cafile=certifi.where())
+
+    # Respect caller-provided trust roots (for corporate TLS interception).
+    extra_cafile = os.getenv("SSL_CERT_FILE")
+    extra_capath = os.getenv("SSL_CERT_DIR")
+    if extra_cafile or extra_capath:
+        ctx.load_verify_locations(cafile=extra_cafile, capath=extra_capath)
+
+    # Python/OpenSSL strict checks can reject some enterprise roots.
+    # Verification stays enabled; only strict extension checks are relaxed.
+    if RELAX_X509_STRICT and hasattr(ssl, "VERIFY_X509_STRICT"):
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+
+    return ctx
+
+
+http_client = httpx.Client(verify=_build_ssl_context(), timeout=60.0)
+
 client = OpenAI(
     base_url="https://api.tokenfactory.nebius.com/v1/",
     api_key=os.getenv("NEBIUS_KEY"),
+    http_client=http_client,
 )
 
 OUTPUTS_DIR = Path(__file__).parent / "outputs"
