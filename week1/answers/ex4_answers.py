@@ -7,30 +7,41 @@ Fill this in after running exercise4_mcp_client.py.
 # ── Basic results ──────────────────────────────────────────────────────────
 
 # Tool names as shown in "Discovered N tools" output.
-TOOLS_DISCOVERED = []
+TOOLS_DISCOVERED = ["search_venues", "get_venue_details"]
 
-QUERY_1_VENUE_NAME    = "FILL_ME_IN"
-QUERY_1_VENUE_ADDRESS = "FILL_ME_IN"
-QUERY_2_FINAL_ANSWER  = "FILL_ME_IN"
+QUERY_1_VENUE_NAME    = "The Haymarket Vaults"
+QUERY_1_VENUE_ADDRESS = "1 Dalry Road, Edinburgh"
+QUERY_2_FINAL_ANSWER  = "No available venue matches 300 guests with vegan options (0 results)."
 
 # ── The experiment ─────────────────────────────────────────────────────────
 # Required: modify venue_server.py, rerun, revert.
 
-EX4_EXPERIMENT_DONE = None   # True or False
+EX4_EXPERIMENT_DONE = True
 
 # What changed, and which files did or didn't need updating? Min 30 words.
 EX4_EXPERIMENT_RESULT = """
-FILL ME IN
+I changed The Albanach status in mcp_venue_server.py from available to full,
+reran exercise4_mcp_client.py, then reverted it. Query 1 changed from two
+matches to one match (only The Haymarket Vaults remained), but the final
+recommended venue/address stayed The Haymarket Vaults. Query 2 stayed the
+same semantically (no 300-person vegan venue). No client code changes were
+required; only server data changed, proving MCP clients react to server-side
+tool/data updates.
 """
 
 # ── MCP vs hardcoded ───────────────────────────────────────────────────────
 
-LINES_OF_TOOL_CODE_EX2 = 0   # count in exercise2_langgraph.py
-LINES_OF_TOOL_CODE_EX4 = 0   # count in exercise4_mcp_client.py
+LINES_OF_TOOL_CODE_EX2 = 10   # count in exercise2_langgraph.py
+LINES_OF_TOOL_CODE_EX4 = 49   # count in exercise4_mcp_client.py
 
 # What does MCP buy you beyond "the tools are in a separate file"? Min 30 words.
 MCP_VALUE_PROPOSITION = """
-FILL ME IN
+MCP gives a stable tool contract across multiple clients, not just file
+separation. The same search_venues/get_venue_details tools were discovered
+dynamically by the LangGraph client, and the architecture also allows Rasa
+to consume the same server. When venue status changed server-side, client
+logic did not change. This improves reuse, consistency, centralized updates,
+and lowers integration risk as more tools are added in later weeks.
 """
 
 # ── PyNanoClaw architecture — SPECULATION QUESTION ─────────────────────────
@@ -70,11 +81,11 @@ FILL ME IN
 #     ambiguous task.
 
 WEEK_5_ARCHITECTURE = """
-- FILL ME IN
-- FILL ME IN
-- FILL ME IN
-- FILL ME IN
-- FILL ME IN
+- Planner: decomposes ambiguous booking goals into ordered subgoals before execution; it lives in the autonomous-loop half.
+- Executor ReAct agent: performs iterative tool-use (search, weather, cost, content generation) and resolves open-ended research; it lives in the autonomous-loop half.
+- Structured confirmation agent (Rasa CALM): enforces deterministic, auditable business rules for deposits/commitments during calls; it lives in the structured-agent half.
+- Shared MCP tool layer: exposes venue and later web/calendar/email capabilities through one contract both halves can discover; it lives in the shared layer.
+- Handoff bridge + memory: routes tasks between autonomous and structured halves and stores state/context for continuity; it lives in the shared layer between both halves.
 """
 
 # ── The guiding question ───────────────────────────────────────────────────
@@ -82,5 +93,12 @@ WEEK_5_ARCHITECTURE = """
 # Must reference specific things you observed in your runs. Min 60 words.
 
 GUIDING_QUESTION_ANSWER = """
-FILL ME IN
+The research should be done by the autonomous LangGraph-style agent, and the
+call/commitment should be handled by the structured Rasa-style agent. In the
+Exercise 4 traces, the research flow needed iterative tool use and recovery
+from argument-shape errors (multiple search_venues calls before a valid one),
+which is a good fit for a flexible ReAct loop. For high-stakes confirmation,
+that same improvisational behavior is risky: you want explicit flows,
+deterministic checks, and auditable transitions. Swapping them feels wrong
+because it would either over-constrain research or under-govern commitments.
 """
