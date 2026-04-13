@@ -13,6 +13,9 @@ RESET   := $(shell tput -Txterm sgr0  2>/dev/null || echo '')
 # ==============================================================================
 UV       := uv
 RASA_DIR := exercise3_rasa
+ZSCALER_CERT := $(HOME)/zscalar/ZscalerRootCertificate-2048-SHA256.crt
+SSL_CERT_PREFIX := $(if $(wildcard $(ZSCALER_CERT)),SSL_CERT_FILE="$(ZSCALER_CERT)" ,)
+UV_RUN := $(SSL_CERT_PREFIX)$(UV) run
 
 # Load .env so targets that need NEBIUS_KEY can access it directly.
 # If .env doesn't exist yet, nothing is loaded (no error).
@@ -109,7 +112,7 @@ install: check-uv check-env ## Set up main environment (Python 3.14, exercises 1
 	@echo "$(BLUE)Setting up main environment...$(RESET)"
 	$(UV) sync
 	@echo "$(GREEN)✓ Main environment ready.$(RESET)"
-	@echo "  Python: $(shell uv run python --version)"
+	@echo "  Python: $(shell $(SSL_CERT_PREFIX)$(UV) run python --version)"
 	@echo "  Run '$(GREEN)make smoke$(RESET)' to verify your API key."
 
 .PHONY: install-rasa
@@ -118,7 +121,7 @@ install-rasa: check-uv ## Set up Rasa Pro environment (Python 3.10, Exercise 3 o
 	@echo "$(YELLOW)Note: This takes 3–5 minutes the first time — Rasa has many dependencies.$(RESET)"
 	cd $(RASA_DIR) && $(UV) sync
 	@echo "$(GREEN)✓ Rasa environment ready.$(RESET)"
-	@echo "  Rasa version: $(shell cd $(RASA_DIR) && uv run rasa --version | head -1)"
+	@echo "  Rasa version: $(shell cd $(RASA_DIR) && $(SSL_CERT_PREFIX)$(UV) run rasa --version | head -1)"
 	@echo "  Run '$(GREEN)make ex3-train$(RESET)' to train the model."
 
 # ==============================================================================
@@ -127,12 +130,12 @@ install-rasa: check-uv ## Set up Rasa Pro environment (Python 3.10, Exercise 3 o
 .PHONY: smoke
 smoke: check-env ## Verify API connection and key are working
 	@echo "$(BLUE)Testing Nebius API connection...$(RESET)"
-	$(UV) run python smoke_test.py
+	$(UV_RUN) python smoke_test.py
 
 .PHONY: test
 test: ## Run unit tests — checks your tool implementations (no API calls)
 	@echo "$(BLUE)Running tool unit tests...$(RESET)"
-	$(UV) run pytest sovereign_agent/tests/test_week1.py -v
+	$(UV_RUN) pytest sovereign_agent/tests/test_week1.py -v
 	@echo ""
 	@echo "$(YELLOW)Fix any failures above before running the exercises.$(RESET)"
 
@@ -144,7 +147,7 @@ ex1: check-env ## Run the context engineering benchmark
 	@echo "$(MAGENTA)Exercise 1 — Context Engineering$(RESET)"
 	@echo "$(YELLOW)Runs ~2 minutes. Results saved to week1/outputs/ex1_results.json$(RESET)"
 	@echo ""
-	$(UV) run python week1/exercise1_context.py
+	$(UV_RUN) python week1/exercise1_context.py
 	@echo ""
 	@echo "$(GREEN)✓ Done. Now fill in week1/answers/ex1_answers.py$(RESET)"
 
@@ -155,7 +158,7 @@ ex1: check-env ## Run the context engineering benchmark
 ex2: check-env ## Run all Exercise 2 tasks (A, B, C, D)
 	@echo "$(MAGENTA)Exercise 2 — LangGraph Research Agent (all tasks)$(RESET)"
 	@echo ""
-	$(UV) run python week1/exercise2_langgraph.py
+	$(UV_RUN) python week1/exercise2_langgraph.py
 	@echo ""
 	@echo "$(GREEN)✓ Done. Now fill in week1/answers/ex2_answers.py$(RESET)"
 
@@ -163,7 +166,7 @@ ex2: check-env ## Run all Exercise 2 tasks (A, B, C, D)
 ex2-a: check-env ## Task A — main Edinburgh brief
 	@echo "$(MAGENTA)Exercise 2 — Task A: Main Edinburgh Brief$(RESET)"
 	@echo ""
-	$(UV) run python week1/exercise2_langgraph.py task_a
+	$(UV_RUN) python week1/exercise2_langgraph.py task_a
 
 .PHONY: ex2-b
 ex2-b: check-env ## Task B — flyer tool (implement the TODO in venue_tools.py first)
@@ -172,19 +175,19 @@ ex2-b: check-env ## Task B — flyer tool (implement the TODO in venue_tools.py 
 	@echo "$(YELLOW)Have you implemented generate_event_flyer in sovereign_agent/tools/venue_tools.py?$(RESET)"
 	@echo "$(YELLOW)Look for the '# ── TODO' block and replace the stub.$(RESET)"
 	@echo ""
-	$(UV) run python week1/exercise2_langgraph.py task_b
+	$(UV_RUN) python week1/exercise2_langgraph.py task_b
 
 .PHONY: ex2-c
 ex2-c: check-env ## Task C — failure mode scenarios
 	@echo "$(MAGENTA)Exercise 2 — Task C: Failure Modes$(RESET)"
 	@echo ""
-	$(UV) run python week1/exercise2_langgraph.py task_c
+	$(UV_RUN) python week1/exercise2_langgraph.py task_c
 
 .PHONY: ex2-d
 ex2-d: ## Task D — agent graph structure (paste output into mermaid.live)
 	@echo "$(MAGENTA)Exercise 2 — Task D: Agent Graph$(RESET)"
 	@echo ""
-	$(UV) run python week1/exercise2_langgraph.py task_d
+	$(UV_RUN) python week1/exercise2_langgraph.py task_d
 	@echo ""
 	@echo "$(YELLOW)Paste the Mermaid output above into: https://mermaid.live$(RESET)"
 
@@ -202,7 +205,7 @@ ex3-train: ## Train the Rasa Pro CALM model (run once, or after changing .yml fi
 	@echo "$(YELLOW)This takes about 2 minutes (embedding model download on first run).$(RESET)"
 	@echo "$(BLUE)Note: CALM trains much faster than old Rasa — no NLU examples to learn.$(RESET)"
 	@echo ""
-	cd $(RASA_DIR) && $(UV) run rasa train
+	cd $(RASA_DIR) && $(UV_RUN) rasa train
 	@echo ""
 	@echo "$(GREEN)✓ Model trained.$(RESET)"
 	@echo "  Now open $(GREEN)two$(RESET) terminals:"
@@ -215,7 +218,7 @@ ex3-actions: ## Terminal 1 — start the action server (keep this running)
 	@echo "$(YELLOW)Keep this terminal open. Start the chat in a second terminal with:$(RESET)"
 	@echo "$(YELLOW)  make ex3-chat$(RESET)"
 	@echo ""
-	cd $(RASA_DIR) && $(UV) run rasa run actions
+	cd $(RASA_DIR) && $(UV_RUN) rasa run actions
 
 .PHONY: ex3-chat
 ex3-chat: ## Terminal 2 — chat with the Rasa agent (run AFTER ex3-actions is running)
@@ -232,7 +235,7 @@ ex3-chat: ## Terminal 2 — chat with the Rasa agent (run AFTER ex3-actions is r
 	@echo ""
 	@echo "$(YELLOW)Copy-paste your terminal output into week1/answers/ex3_answers.py$(RESET)"
 	@echo ""
-	cd $(RASA_DIR) && $(UV) run rasa shell
+	cd $(RASA_DIR) && $(UV_RUN) rasa shell
 
 .PHONY: ex3-retrain
 ex3-retrain: ex3-train ## Alias: retrain after Task B changes (same as ex3-train)
@@ -244,7 +247,7 @@ ex3-retrain: ex3-train ## Alias: retrain after Task B changes (same as ex3-train
 ex4: check-env ## Run the MCP client (server starts automatically)
 	@echo "$(MAGENTA)Exercise 4 — Shared MCP Server$(RESET)"
 	@echo ""
-	$(UV) run python week1/exercise4_mcp_client.py
+	$(UV_RUN) python week1/exercise4_mcp_client.py
 	@echo ""
 	@echo "$(GREEN)✓ Done. Complete the required experiment, then fill in week1/answers/ex4_answers.py$(RESET)"
 
@@ -255,26 +258,26 @@ ex4: check-env ## Run the MCP client (server starts automatically)
 grade: ## Run all mechanical checks before submitting
 	@echo "$(BLUE)Running mechanical grade checks...$(RESET)"
 	@echo ""
-	$(UV) run python week1/grade.py
+	$(UV_RUN) python week1/grade.py
 	@echo ""
 	@echo "$(YELLOW)Fix every ✗ before submitting.$(RESET)"
 	@echo "Warnings (⚠) are advisory — worth reading but not blocking."
 
 .PHONY: grade-ex1
 grade-ex1: ## Check Exercise 1 only
-	$(UV) run python week1/grade.py ex1
+	$(UV_RUN) python week1/grade.py ex1
 
 .PHONY: grade-ex2
 grade-ex2: ## Check Exercise 2 only
-	$(UV) run python week1/grade.py ex2
+	$(UV_RUN) python week1/grade.py ex2
 
 .PHONY: grade-ex3
 grade-ex3: ## Check Exercise 3 only
-	$(UV) run python week1/grade.py ex3
+	$(UV_RUN) python week1/grade.py ex3
 
 .PHONY: grade-ex4
 grade-ex4: ## Check Exercise 4 only
-	$(UV) run python week1/grade.py ex4
+	$(UV_RUN) python week1/grade.py ex4
 
 # ==============================================================================
 # 🛠️ Development Utilities
@@ -282,14 +285,14 @@ grade-ex4: ## Check Exercise 4 only
 .PHONY: lint
 lint: ## Check code style with ruff (does not change files)
 	@echo "$(BLUE)Checking code style...$(RESET)"
-	$(UV) run ruff check sovereign_agent/ week1/
+	$(UV_RUN) ruff check sovereign_agent/ week1/
 	@echo "$(GREEN)✓ Lint complete.$(RESET)"
 
 .PHONY: lint-fix
 lint-fix: ## Auto-fix style issues with ruff
 	@echo "$(BLUE)Fixing code style...$(RESET)"
-	$(UV) run ruff check --fix sovereign_agent/ week1/
-	$(UV) run ruff format sovereign_agent/ week1/
+	$(UV_RUN) ruff check --fix sovereign_agent/ week1/
+	$(UV_RUN) ruff format sovereign_agent/ week1/
 
 .PHONY: clean
 clean: ## Remove build artefacts, caches, and generated output files
